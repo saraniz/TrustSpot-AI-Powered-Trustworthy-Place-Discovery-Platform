@@ -25,11 +25,11 @@ public class UserController {
     public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
 
         // call the userService to handle the registration logic, passing the RegisterRequest object
-        userService.register(request);
+        RegisterResponse response = userService.register(request);
 
         // return a response indicating that the user was created successfully, with an HTTP 200 OK status
         // ResponseEntity() It is a Spring Boot class used to represent the full HTTP response.
         
-        return ResponseEntity.ok("User created successfully");
+        return ResponseEntity.ok(response);
     }
 }
