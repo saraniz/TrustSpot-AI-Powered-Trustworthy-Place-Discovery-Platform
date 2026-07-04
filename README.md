@@ -17,6 +17,21 @@ The application consists of three independent Spring Boot microservices backed b
 
 ---
 
+## 📷 Screenshots
+
+Here are some visual highlights of the TrustSpot platform:
+
+### 1. Main Landing & Places Discovery
+![Landing Discovery](./Screenshots/Screenshot%20(25).png)
+
+### 2. Location View & Review Contributions
+![Place details](./Screenshots/Screenshot%20(26).png)
+
+### 3. Dynamic User Dashboard & Analytics
+![Dynamic Dashboard](./Screenshots/Screenshot%20(27).png)
+
+---
+
 ## ✨ Key Features
 
 1. **Microservices Design**: Decoupled domain models where each microservice operates on its own port and database.
