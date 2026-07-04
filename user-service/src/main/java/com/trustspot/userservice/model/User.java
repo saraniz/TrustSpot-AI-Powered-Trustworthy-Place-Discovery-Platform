@@ -26,8 +26,10 @@ public class User {
     @Column(length= 250)
     private String bio;
 
+    @Column(length = 16777215)
     private String profileImageUrl;
 
+    @Column(length = 16777215)
     private String coverImageUrl;
 
     //constructor

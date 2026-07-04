@@ -2,19 +2,55 @@ package com.trustspot.userservice.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-// Marks this class as a Spring configuration class, Spring will scan it and load beans from it
-// This class is responsible for configuring security-related beans, such as the password encoder. By defining a BCryptPasswordEncoder bean, we can use it throughout the application to hash passwords securely before storing them in the database.
+import java.util.Arrays;
+
 @Configuration
+@EnableWebSecurity
 public class SecurityConfig {
 
-    // Define a bean for BCryptPasswordEncoder, which is a password hashing function that incorporates a salt to protect against rainbow table attacks. By using this encoder, we can ensure that user passwords are stored securely in the database.
-    // @Bean Tells Spring: “Create and manage this object for me”
     @Bean
-    // BCryptPasswordEncoder From Spring Security
-    // Used to: Hash passwords, Verify passwords securely
-    public BCryptPasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(); // This creates a global password encoder object that can be injected into other parts of the application where password hashing is needed, such as during user registration or authentication processes.
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .headers(headers -> headers.frameOptions(frame -> frame.disable())) // Allow H2 console frames
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(
+                    "/api/users/register",
+                    "/api/users/login",
+                    "/api/users/validate",
+                    "/api/users/**",
+                    "/h2-console/**"
+                ).permitAll()
+                .anyRequest().permitAll() // Permit all for easier local testing across microservices
+            )
+            .httpBasic(httpBasic -> httpBasic.disable());
+
+        return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("*")); // Allow all origins for dev environment
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

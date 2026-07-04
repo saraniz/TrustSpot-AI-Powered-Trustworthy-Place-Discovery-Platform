@@ -2,55 +2,133 @@ package com.trustspot.userservice.service;
 
 import com.trustspot.userservice.dto.RegisterRequest;
 import com.trustspot.userservice.dto.RegisterResponse;
+import com.trustspot.userservice.dto.LoginRequest;
+import com.trustspot.userservice.dto.LoginResponse;
+import com.trustspot.userservice.dto.UserByIdResponse;
+import com.trustspot.userservice.dto.UpdateRequest;
+import com.trustspot.userservice.dto.UpdateResponse;
 import com.trustspot.userservice.mapper.UserMapper;
 import com.trustspot.userservice.model.User;
 import com.trustspot.userservice.repository.UserRepository;
-import com.trustspot.userservice.security.JwtService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import com.trustspot.userservice.security.JWTService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
-// The Service layer is the part of your backend where business logic is written.
+import java.util.HashMap;
+import java.util.Map;
 
-// It sits between:
-// Controller (API layer)
-// Repository (database layer)
-// Simple meaning
+// Service layer responsibilities:
+// Takes input from controller (usually Request DTOs)
+// Processes business logic
+// Returns output (usually Response DTOs)
+// So it naturally uses both.
 
-// Service layer means: “What should the system do with the data?”
+/*
+ * @Service:
+ * Marks this class as a Spring Service layer component.
+ * Spring automatically creates and manages its object (bean).
+ */
+@Service
+public class UserService {
 
-// Not:how to receive data (Controller) ,how to store data (Repository)
-
-// Only: rules, logic, processing
-
-// Automatically detects this class during scanning
-// Creates an object (bean) of it
-// Keeps it in Spring container
-@Service //Marks this class as a Service layer component in Spring.
-public class UserService{
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
-    private final BCryptPasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+    private final PasswordEncoder passwordEncoder;
+    private final JWTService jwtService;
 
-    public UserService(UserRepository userRepository, BCryptPasswordEncoder passwordEncoder, JwtService jwtService) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, JWTService jwtService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
-
     }
 
-    // request is a method parameter object of type RegisterRequest.
-    public void register(RegisterRequest request){
+    public RegisterResponse register(RegisterRequest request) {
+        log.debug("Register request received for email={} name={}", request.getEmail(), request.getName());
+        User user = UserMapper.toEntity(request);
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
 
-        User user = UserMapper.toEntity(request); // Converts the RegisterRequest DTO to a User entity using the UserMapper.
+        log.debug("Saving new user email={}", user.getEmail());
+        userRepository.save(user);
 
-        //hash password before saving to database
-        user.setPassword(passwordEncoder.encode(user.getPassword())); // Hashes the password from the RegisterRequest using BCryptPasswordEncoder and sets it in the User entity.
-        userRepository.save(user); // Saves the User entity to the database using the userRepository.
+        log.debug("Generating JWT for userId={} email={}", user.getId(), user.getEmail());
+        String token = jwtService.generateToken(user.getEmail());
+        log.debug("Register completed for userId={} email={}", user.getId(), user.getEmail());
+        return new RegisterResponse(token, user.getId(), user.getEmail(), user.getName());
+    }
 
-        //generate JWT token for the user
-        String token = jwtService.generateToken(user.getEmail()); // Generates a JWT token for the user using the JwtService.
-    
-        return new RegisterResponse(token, user.getEmail()); // Returns a RegisterResponse containing the generated JWT token.
+    public LoginResponse login(LoginRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new RuntimeException("Invalid password");
+        }
+
+        String token = jwtService.generateToken(user.getEmail());
+        return new LoginResponse(token, user.getId(), user.getEmail(), user.getName());
+    }
+
+    public UserByIdResponse getUserById(long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        return UserMapper.toUserByIdResponse(user);
+    }
+
+    public UpdateResponse update(long id, UpdateRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (request.getName() != null) {
+            user.setName(request.getName());
+        }
+        if (request.getBio() != null) {
+            user.setBio(request.getBio());
+        }
+        if (request.getProfileImageUrl() != null) {
+            user.setProfileImageUrl(request.getProfileImageUrl());
+        }
+        if (request.getCoverImageUrl() != null) {
+            user.setCoverImageUrl(request.getCoverImageUrl());
+        }
+
+        userRepository.save(user);
+        return new UpdateResponse(user.getId(), user.getName(), user.getEmail(), user.getBio(), user.getProfileImageUrl(), user.getCoverImageUrl());
+    }
+
+    public UserByIdResponse updateProfileImage(long id, String imageUrl) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setProfileImageUrl(imageUrl);
+        userRepository.save(user);
+        return UserMapper.toUserByIdResponse(user);
+    }
+
+    public UserByIdResponse updateCoverImage(long id, String imageUrl) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setCoverImageUrl(imageUrl);
+        userRepository.save(user);
+        return UserMapper.toUserByIdResponse(user);
+    }
+
+    public Map<String, Object> validateToken(String token) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            String email = jwtService.getEmailFromToken(token);
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            boolean isValid = jwtService.validateToken(token, email);
+            response.put("valid", isValid);
+            response.put("userId", user.getId());
+            response.put("email", user.getEmail());
+            response.put("name", user.getName());
+        } catch (Exception e) {
+            response.put("valid", false);
+        }
+        return response;
     }
 }

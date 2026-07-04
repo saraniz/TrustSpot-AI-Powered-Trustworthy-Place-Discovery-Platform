@@ -4,6 +4,7 @@ package com.trustspot.userservice.mapper;
 // Because: User is in model package, RegisterRequest is in dto package
 import com.trustspot.userservice.dto.RegisterRequest;
 import com.trustspot.userservice.model.User;
+import com.trustspot.userservice.dto.UserByIdResponse;
 
 public class UserMapper {
 
@@ -26,5 +27,18 @@ public class UserMapper {
         user.setPassword(request.getPassword());
 
         return user;
+    }
+
+    // Entity → DTO (Response)
+    // A method that converts User → UserByIdResponse so service doesn’t manually map fields anymore.
+    public static UserByIdResponse toUserByIdResponse(User user) {
+        return new UserByIdResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getBio(),
+                user.getProfileImageUrl(),
+                user.getCoverImageUrl()
+        );
     }
 }
